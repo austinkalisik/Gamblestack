@@ -14,6 +14,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    networks:
+      default:
+        ipv4_address: 10.203.77.10
 
   redis:
     image: docker.io/library/redis:7-alpine
@@ -22,6 +25,9 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - gamblestack_redis:/data
+    networks:
+      default:
+        ipv4_address: 10.203.77.11
 
   rabbitmq:
     image: docker.io/library/rabbitmq:3-management-alpine
@@ -32,46 +38,66 @@ services:
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     volumes:
       - gamblestack_rabbitmq:/var/lib/rabbitmq
+    networks:
+      default:
+        ipv4_address: 10.203.77.12
 
   auth:
     build:
       context: ./services/auth
+      network: host
     container_name: gamblestack-auth
     restart: unless-stopped
     env_file: .env
     depends_on:
       - postgres
+    networks:
+      default:
+        ipv4_address: 10.203.77.21
 
   wallet:
     build:
       context: ./services/wallet
+      network: host
     container_name: gamblestack-wallet
     restart: unless-stopped
     env_file: .env
     depends_on:
       - postgres
+    networks:
+      default:
+        ipv4_address: 10.203.77.22
 
   sportsbook:
     build:
       context: ./services/sportsbook
+      network: host
     container_name: gamblestack-sportsbook
     restart: unless-stopped
     env_file: .env
     depends_on:
       - rabbitmq
+    networks:
+      default:
+        ipv4_address: 10.203.77.23
 
   games-provablyfair:
     build:
       context: ./services/games-provablyfair
+      network: host
     container_name: gamblestack-games
     restart: unless-stopped
     env_file: .env
     depends_on:
       - postgres
+    networks:
+      default:
+        ipv4_address: 10.203.77.24
 
   api-gateway:
     build:
       context: ./services/api-gateway
+      network: host
     container_name: gamblestack-api
     restart: unless-stopped
     env_file: .env
@@ -82,16 +108,23 @@ services:
       - wallet
       - sportsbook
       - games-provablyfair
+    networks:
+      default:
+        ipv4_address: 10.203.77.25
 
   web:
     build:
       context: ./web
+      network: host
     container_name: gamblestack-web
     restart: unless-stopped
     ports:
       - "127.0.0.1:${WEB_BIND_PORT}:3000"
     depends_on:
       - api-gateway
+    networks:
+      default:
+        ipv4_address: 10.203.77.26
 
 volumes:
   gamblestack_postgres:
