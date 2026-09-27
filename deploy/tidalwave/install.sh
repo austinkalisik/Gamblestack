@@ -164,51 +164,63 @@ set -a
 . "$APP/.env"
 set +a
 
-# 6. Create an isolated Podman network, then start private infrastructure.
-log "Preparing isolated Gamblestack Podman network"
+# 6. Create an isolated DNS-free Podman network, then start private infrastructure.
+log "Preparing DNS-free Gamblestack Podman network"
 
-# Remove only failed/stale Gamblestack containers from an earlier partial install.
-for c in   gamblestack-postgres gamblestack-redis gamblestack-rabbitmq   gamblestack-auth gamblestack-wallet gamblestack-sportsbook   gamblestack-games gamblestack-api gamblestack-web
+# Remove only failed/stale Gamblestack containers from earlier attempts.
+for c in \
+  gamblestack-postgres gamblestack-redis gamblestack-rabbitmq \
+  gamblestack-auth gamblestack-wallet gamblestack-sportsbook \
+  gamblestack-games gamblestack-api gamblestack-web
 do
   podman rm -f "$c" >/dev/null 2>&1 || true
 done
 
-# Remove the old compose-created network that collided on 10.89.1.1.
+# cPanel/hosting DNS may own port 53 on the host.  Do not stop it.
+# Disable Aardvark DNS for this network and use fixed private service IPs.
 podman network rm -f gamblestack_default >/dev/null 2>&1 || true
+podman network rm -f gamblestack-net >/dev/null 2>&1 || true
 
-if ! podman network exists gamblestack-net >/dev/null 2>&1; then
-  CREATED=0
+podman network create \
+  --disable-dns \
+  --subnet 10.203.77.0/24 \
+  --gateway 10.203.77.1 \
+  gamblestack-net >/dev/null
 
-  for NETSPEC in     "10.203.77.0/24 10.203.77.1"     "10.204.77.0/24 10.204.77.1"     "10.205.77.0/24 10.205.77.1"     "172.29.77.0/24 172.29.77.1"
-  do
-    set -- $NETSPEC
-    SUBNET="$1"
-    GATEWAY="$2"
+echo "[PASS] Created DNS-free gamblestack-net on 10.203.77.0/24"
 
-    if ip -4 route show | grep -Fq "$SUBNET"; then
-      continue
-    fi
+podman run --rm \
+  --network gamblestack-net \
+  docker.io/library/alpine:3.20 \
+  true >/dev/null 2>&1 \
+  || die "DNS-free Gamblestack network could not start a test container."
 
-    if podman network create         --subnet "$SUBNET"         --gateway "$GATEWAY"         gamblestack-net >/dev/null 2>&1; then
+echo "[PASS] DNS-free network startup test"
 
-      echo "[PASS] Created gamblestack-net on $SUBNET"
+upsert_env() {
+  local key="$1"
+  local value="$2"
+  if grep -q "^$key=" "$APP/.env"; then
+    sed -i "s|^$key=.*|$key=$value|" "$APP/.env"
+  else
+    printf '%s=%s\n' "$key" "$value" >> "$APP/.env"
+  fi
+}
 
-      # Force Aardvark/Netavark to start now so a DNS bind problem is caught
-      # before the actual application containers are created.
-      if podman run --rm           --network gamblestack-net           docker.io/library/alpine:3.20           true >/dev/null 2>&1; then
-        CREATED=1
-        break
-      fi
+upsert_env DATABASE_URL "postgres://gamblestack:$POSTGRES_PASSWORD@10.203.77.10:5432/gamblestack"
+upsert_env REDIS_URL "redis://10.203.77.11:6379"
+upsert_env RABBITMQ_URL "amqp://gamblestack:$RABBITMQ_PASSWORD@10.203.77.12:5672"
+upsert_env AUTH_URL "http://10.203.77.21:4001"
+upsert_env WALLET_URL "http://10.203.77.22:4002"
+upsert_env SPORTSBOOK_URL "http://10.203.77.23:4003"
+upsert_env GAMES_URL "http://10.203.77.24:4004"
 
-      echo "[WARN] Network $SUBNET failed its startup test; trying another subnet."
-      podman network rm -f gamblestack-net >/dev/null 2>&1 || true
-    fi
-  done
+chmod 600 "$APP/.env"
 
-  [ "$CREATED" = "1" ] || die "Could not create a collision-free Gamblestack Podman network."
-else
-  echo "[PASS] Existing gamblestack-net found."
-fi
+# Reload the corrected environment into this installer process.
+set -a
+. "$APP/.env"
+set +a
 
 log "Starting PostgreSQL, Redis and RabbitMQ"
 
