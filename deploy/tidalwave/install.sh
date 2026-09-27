@@ -5,6 +5,7 @@ REPO="https://github.com/austinkalisik/Gamblestack.git"
 BRANCH="tidalwave-deploy"
 APP="/opt/gamblestack"
 DOMAIN="${DOMAIN:-bet.tidalwavesoftwebsolutions.tech}"
+SERVER_IP="${SERVER_IP:-187.52.117.54}"
 COMPOSE_FILE="$APP/docker-compose.tidalwave.yml"
 APACHE_CONF=""
 ACME_ROOT="/var/www/gamblestack-acme"
@@ -363,7 +364,7 @@ else
 fi
 
 cat > "$APACHE_CONF" <<EOF
-<VirtualHost *:80>
+<VirtualHost $SERVER_IP:80>
     ServerName $DOMAIN
     ProxyPreserveHost On
     ProxyRequests Off
@@ -400,7 +401,7 @@ fi
 if [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ] && [ -f "/etc/letsencrypt/live/$DOMAIN/privkey.pem" ]; then
   cat >> "$APACHE_CONF" <<EOF
 
-<VirtualHost *:443>
+<VirtualHost $SERVER_IP:443>
     ServerName $DOMAIN
     SSLEngine on
     SSLCertificateFile /etc/letsencrypt/live/$DOMAIN/fullchain.pem
