@@ -1,23 +1,47 @@
-import fetch from "node-fetch";
 import { IVRFProvider } from "./index";
 import { v4 as uuidv4 } from "uuid";
 
 export class HSMProvider implements IVRFProvider {
   async requestRandomness(seedHint = "") {
     const requestId = uuidv4();
-    // send request to HSM to generate seed + sign (assumes HSM stores secrets)
-    await fetch(process.env.HSM_API_ENDPOINT + "/request", {
+    const endpoint = process.env.HSM_API_ENDPOINT;
+
+    if (!endpoint) {
+      return { requestId };
+    }
+
+    await fetch(endpoint + "/request", {
       method: "POST",
       body: JSON.stringify({ requestId, seedHint }),
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
+
     return { requestId };
   }
 
   async getProof(requestId: string) {
-    const r = await fetch(process.env.HSM_API_ENDPOINT + `/proof/${requestId}`);
-    if (r.status !== 200) throw new Error("no proof yet");
-    const proof = await r.json();
-    return { requestId, seed: proof.seed, proof: proof.signature };
+    const endpoint = process.env.HSM_API_ENDPOINT;
+
+    if (!endpoint) {
+      return {
+        requestId,
+        seed: uuidv4().replace(/-/g, ""),
+        proof: { provider: "local-mvp-fallback" },
+      };
+    }
+
+    const response = await fetch(endpoint + `/proof/${requestId}`);
+    if (!response.ok) throw new Error("no proof yet");
+
+    const proof = (await response.json()) as {
+      seed: string;
+      signature?: unknown;
+    };
+
+    return {
+      requestId,
+      seed: proof.seed,
+      proof: proof.signature ?? null,
+    };
   }
 }
