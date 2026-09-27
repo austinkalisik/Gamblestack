@@ -29,22 +29,22 @@ app.use((req, res, next) => {
 app.get("/health", (_, res) => res.json({ ok: true, service: "api-gateway" }));
 
 app.use("/auth", createProxyMiddleware({
-  target: "http://auth:4001",
+  target: process.env.AUTH_URL || "http://10.203.77.21:4001",
   changeOrigin: true,
   pathRewrite: { "^/auth": "" },
 }));
 app.use("/wallet", createProxyMiddleware({
-  target: "http://wallet:4002",
+  target: process.env.WALLET_URL || "http://10.203.77.22:4002",
   changeOrigin: true,
   pathRewrite: { "^/wallet": "" },
 }));
 app.use("/sportsbook", createProxyMiddleware({
-  target: "http://sportsbook:4003",
+  target: process.env.SPORTSBOOK_URL || "http://10.203.77.23:4003",
   changeOrigin: true,
   pathRewrite: { "^/sportsbook": "" },
 }));
 app.use("/games", createProxyMiddleware({
-  target: "http://games-provablyfair:4004",
+  target: process.env.GAMES_URL || "http://10.203.77.24:4004",
   changeOrigin: true,
   pathRewrite: { "^/games": "" },
 }));
