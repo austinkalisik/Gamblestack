@@ -1,7 +1,7 @@
 FROM node:20-alpine
 WORKDIR /app
 COPY package.json ./
-RUN npm install --omit=optional
+RUN npm install --include=optional
 COPY . .
 RUN npm run build
 EXPOSE 3000
