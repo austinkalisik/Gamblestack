@@ -1,0 +1,99 @@
+services:
+  postgres:
+    image: docker.io/library/postgres:15-alpine
+    container_name: gamblestack-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gamblestack
+      POSTGRES_USER: gamblestack
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - gamblestack_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gamblestack -d gamblestack"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: docker.io/library/redis:7-alpine
+    container_name: gamblestack-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - gamblestack_redis:/data
+
+  rabbitmq:
+    image: docker.io/library/rabbitmq:3-management-alpine
+    container_name: gamblestack-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: gamblestack
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - gamblestack_rabbitmq:/var/lib/rabbitmq
+
+  auth:
+    build:
+      context: ./services/auth
+    container_name: gamblestack-auth
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - postgres
+
+  wallet:
+    build:
+      context: ./services/wallet
+    container_name: gamblestack-wallet
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - postgres
+
+  sportsbook:
+    build:
+      context: ./services/sportsbook
+    container_name: gamblestack-sportsbook
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - rabbitmq
+
+  games-provablyfair:
+    build:
+      context: ./services/games-provablyfair
+    container_name: gamblestack-games
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - postgres
+
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+    container_name: gamblestack-api
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:${API_BIND_PORT}:4000"
+    depends_on:
+      - auth
+      - wallet
+      - sportsbook
+      - games-provablyfair
+
+  web:
+    build:
+      context: ./web
+    container_name: gamblestack-web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${WEB_BIND_PORT}:3000"
+    depends_on:
+      - api-gateway
+
+volumes:
+  gamblestack_postgres:
+  gamblestack_redis:
+  gamblestack_rabbitmq:
