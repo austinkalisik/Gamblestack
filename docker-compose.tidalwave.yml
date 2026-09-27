@@ -97,3 +97,8 @@ volumes:
   gamblestack_postgres:
   gamblestack_redis:
   gamblestack_rabbitmq:
+
+networks:
+  default:
+    external: true
+    name: gamblestack-net
