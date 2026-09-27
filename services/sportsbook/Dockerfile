@@ -1,7 +1,8 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+COPY package.json ./
+RUN npm install --omit=optional
 COPY . .
-RUN yarn build
-CMD ["node", "dist/main.js"]
+RUN npm run build
+EXPOSE 4003
+CMD ["npm","start"]
