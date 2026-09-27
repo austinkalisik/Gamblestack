@@ -1,7 +1,9 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+RUN apk add --no-cache python3 make g++
+COPY package.json ./
+RUN npm install --omit=optional
 COPY . .
-RUN yarn build
-CMD ["node", "dist/main.js"]
+RUN npm run build
+EXPOSE 4001
+CMD ["npm","start"]
